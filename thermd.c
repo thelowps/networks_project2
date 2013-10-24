@@ -25,22 +25,57 @@ int receive_sensor_data (int conn, struct sensor_data* sdata) {
   return ret;
 }
 
+int write_data_to_file (struct sensor_data* sdata1, struct sensor_data* sdata2) {
+  char full_filename[30] = "/var/log/therm/temp_logs/";
+  char filename[30] = "g18_";
+  snprintf(filename+4, 5, "%s", sdata1->timestamp);
+  filename[8] = '_';
+  snprintf(filename+9, 3, "%s", sdata1->timestamp+5);
+  filename[11] = '_';
+  snprintf(filename+12, 33, "%s", sdata1->hostname);
+  
+  strcat(full_filename, filename);
+#ifdef DEBUG 
+  printf("Server: writing to file %s\n", full_filename);
+#endif
+  
+  FILE* file = fopen(full_filename, "a");
+  if (file == NULL) {
+    return -1;
+  }
+  
+  char toprint [50];
+  sprintf(toprint, "%s %.2lf %.2lf\n", sdata1->timestamp, sdata1->data, sdata2->data);
+#ifdef DEBUG
+  printf("Printing to file: %s\n", toprint);
+#endif
+  fprintf(file, toprint);
+  fclose(file);
+  return 0;
+}
+
 // Handles a single client
 void handle_client (int conn) {
-  int i;
-  struct sensor_data sdata;
-  for (i = 0; i < sdata.host_num_sensors; ++i) {
-    if (receive_sensor_data(conn, &sdata) < 0) {
-      // kill thread?
+  int i = 0;
+  struct sensor_data sdata[2];
+
+  do {
+    if (receive_sensor_data(conn, sdata+i) < 0) {
+      // error in receive -- kill thread?
     }
     
 #ifdef DEBUG 
     char debug[1024];
-    sdatatostr(&sdata, debug, 1024);
+    sdatatostr(sdata+i, debug, 1024);
     printf("Received sensor data: \n%s\n\n", debug);
 #endif
-    
-  }
+    ++i;
+  } while (i < sdata[0].host_num_sensors);
+
+  // Write data to file
+  if (sdata[0].action == 0) {
+    write_data_to_file(sdata, sdata+1);
+  }  
 
   close(conn);
 }

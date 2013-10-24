@@ -1,6 +1,16 @@
 #ifndef SENSOR_H
 #define SENSOR_H
 
+/** 
+ *  sensor.h
+ *  Written by Andi Cescolini and David Lopes
+ *  Computer Networks, 2013
+ *  University of Notre Dame
+ *
+ *  A library to do a variety of things related to sensor data and manipulating it.
+ *
+ */
+
 // Encompasses data about one sensor
 struct sensor_data {
   char hostname [32];

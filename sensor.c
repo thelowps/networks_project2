@@ -1,3 +1,13 @@
+/** 
+ *  sensor.c
+ *  Written by Andi Cescolini and David Lopes
+ *  Computer Networks, 2013
+ *  University of Notre Dame
+ *
+ *  A library to do a variety of things related to sensor data and manipulating it.
+ *
+ */
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -31,12 +41,12 @@ int serializesdata (struct sensor_data* sdata, void* dest) {
 }
 
 void deserializesdata (struct sensor_data* sdata, void* data) {
-  char year[4], mday[5], hour[2], minute[2], second[2];
+  char year[4], month[2], day[2], hour[2], minute[2];
   sscanf(data, "%s %d %d %lf %lf %lf %s %s %s %s %s %d", 
 	 &(sdata->hostname), &(sdata->host_num_sensors), &(sdata->sensor_number),
 	 &(sdata->data), &(sdata->acceptable_low), &(sdata->acceptable_high),
-	 &year, &mday, &hour, &minute, &second, &(sdata->action));
-  sprintf(sdata->timestamp, "%s %s %s %s %s", year, mday, hour, minute, second);
+	 &year, &month, &day, &hour, &minute, &(sdata->action));
+  sprintf(sdata->timestamp, "%s %s %s %s %s", year, month, day, hour, minute);
 }
 
 

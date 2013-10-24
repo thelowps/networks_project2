@@ -25,17 +25,17 @@ void gettimestamp(char* stamp, int len) {
   struct tm* timeinfo;
   time (&rawtime);
   timeinfo = localtime (&rawtime);
-  strftime (stamp, len, "%G %m/%d %H %M %S", timeinfo);
+  strftime (stamp, len, "%G %m %d %H %M", timeinfo);
 }
 
-// Appends a timestamp and newline and writes to /var/log/therm/error/18_error_log
+// Appends a timestamp and newline and writes to /var/log/therm/error/g18_error_log
 void write_to_error_log (const char* error) {
   char* msg = malloc(sizeof(char) * (strlen(error) + 37));
   gettimestamp(msg, 32);
   strcat(msg, " -- ");
   strcat(msg, error);
   strcat(msg, "\n");
-  FILE* errfile = fopen("/var/log/therm/error/18_error_log", "a");
+  FILE* errfile = fopen("/var/log/therm/error/g18_error_log", "a");
   fprintf(errfile, msg);
   fclose(errfile);
 }
