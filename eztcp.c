@@ -14,15 +14,24 @@
 #include <string.h>
 #include <netinet/in.h>
 
+#include "eztcp.h"
+
+// A switch to control whether or not the library prints out
+// errors or just returns error values.
+int EZ_PRINT_ERROR = 1; // OH GOD A GLOBAL VARIABLE RUN
+
+void ezsetprinterror (int p) {
+  EZ_PRINT_ERROR = p;
+}
+
 int ezconnect (int* sock, char* ip, int port) {
-  int s;
+  int s, err;
   struct sockaddr_in servaddr,cliaddr;
   
   // OPEN SOCKET
-  s = socket(AF_INET,SOCK_STREAM,0);
-  if (s == -1) {
-    perror("Error when initializing the socket descriptor");
-    return -1;
+  if ((s = socket(AF_INET,SOCK_STREAM,0)) < 0) {
+    if (EZ_PRINT_ERROR) perror("Error when initializing socket descriptor");
+    return s;
   }
 
   memset(&servaddr, 0, sizeof(servaddr));
@@ -31,55 +40,69 @@ int ezconnect (int* sock, char* ip, int port) {
   servaddr.sin_port = htons(port);
 
   // CONNECT
-  if (connect(s, (struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
-    perror("Error connecting to server");
-    return -1;
+  if (err = connect(s, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+    if (EZ_PRINT_ERROR) perror("Error when connecting");
+    return err;
   }
 
   *sock = s;
+  return 0;
 }
 
-int ezsend (int sock, unsigned char* data, int len) {
+int ezsend (int sock, void* data, int len) {
   struct sockaddr_in servaddr;
-  int s = sendto(sock, data, len, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
-  if (s < 0) {
-    perror("ERROR IN SEND");
+  int s;
+  if ((s = sendto(sock, data, len, 0, (struct sockaddr *)&servaddr, sizeof(servaddr))) < 0) {
+    if (EZ_PRINT_ERROR) perror("Error when sending data");
   }
   return s;
 }
 
-int ezreceive (int sock, unsigned char* data, int len) {
-  int socklen = (sizeof(struct sockaddr_in));
-  int n = recvfrom(sock, data, len, 0, NULL, &socklen);
-  if (n < 0) {
-    perror("ERROR IN RECEIVE");
+int ezreceive (int sock, void* data, int len) {
+  int n, socklen = (sizeof(struct sockaddr_in));
+  if ((n = recvfrom(sock, data, len, 0, NULL, &socklen)) < 0) {
+    if (EZ_PRINT_ERROR) perror("Error when receiving data");
   } 
   return n;
 }
-
+	       
 int ezlisten (int* sock, int port) {
-  int listenfd, connfd, n;
+  int listenfd, connfd, err;
   struct sockaddr_in servaddr;
+  
+  if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    if (EZ_PRINT_ERROR) perror("Error when initializing socket descriptor");
+    return listenfd;
+  }
 
-  listenfd = socket(AF_INET, SOCK_STREAM, 0);
+  // This makes our server relinquish the port for reuse upon a crash
   int optval = 1;
-  setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, 
-	     (const void *)&optval , sizeof(int));
+  setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int));
 
   bzero(&servaddr, sizeof(servaddr));
   servaddr.sin_family = AF_INET;
   servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
   servaddr.sin_port = htons(port);
 
-  bind(listenfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
+  if ((err = bind(listenfd,(struct sockaddr *)&servaddr,sizeof(servaddr))) < 0) {
+    if (EZ_PRINT_ERROR) perror("Error when binding socket");
+    return err;
+  }
+  if ((err = listen(listenfd, 1)) < 0) {
+    if (EZ_PRINT_ERROR) perror("Error when listening on socket");
+    return err;
+  }
   
-  listen(listenfd, 1); // backlog of 1?
-
   *sock = listenfd;
+  return 0;
 }
 
-int ezaccept (int sock, int* conn) {
+int ezaccept (int sock) {
   socklen_t clilen;
   struct sockaddr_in cliaddr;
-  *conn = accept(sock, (struct sockaddr *)&cliaddr, &clilen); // TODO : error checking
+  int conn;
+  if ((conn = accept(sock, (struct sockaddr *)&cliaddr, &clilen)) < 0) {
+    if (EZ_PRINT_ERROR) perror("Error when accepting new client");
+  }
+  return conn;
 }

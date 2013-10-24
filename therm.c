@@ -14,9 +14,10 @@
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
-#include "sensor_data.h"
-#include "sensor_reader.h"
+#include "sensor.h"
 #include "eztcp.h"
+
+#define DEBUG
 
 // quick and dirty
 void gettimestamp(char* stamp, int len) {
@@ -27,12 +28,25 @@ void gettimestamp(char* stamp, int len) {
   strftime (stamp, len, "%G %m/%d %H %M %S", timeinfo);
 }
 
+// Appends a timestamp and newline and writes to /var/log/therm/error/18_error_log
+void write_to_error_log (const char* error) {
+  char* msg = malloc(sizeof(char) * (strlen(error) + 37));
+  gettimestamp(msg, 32);
+  strcat(msg, " -- ");
+  strcat(msg, error);
+  strcat(msg, "\n");
+  FILE* errfile = fopen("/var/log/therm/error/18_error_log", "a");
+  fprintf(errfile, msg);
+  fclose(errfile);
+}
+
 int main (int argc, char** argv) {
   
   // Setup filenames
   char* conf_filename = "/etc/t_client/client.conf";
   char* sensor_filename = "/dev/gotemp";
   char* sensor_filename2 = "/dev/gotemp2";
+
 
   /////////////////////////////////
   // READ THE CONFIGURATION FILE //
@@ -41,7 +55,10 @@ int main (int argc, char** argv) {
   // Open the file
   FILE* conf_file = fopen("/etc/t_client/client.conf", "r");
   if (conf_file == NULL) {
+#ifdef DEBUG
     fprintf(stderr, "FATAL: Error opening configuration file.");
+#endif
+    write_to_error_log("Error opening configuration file.");
     return 1;
   }
   
@@ -61,40 +78,78 @@ int main (int argc, char** argv) {
     fscanf(conf_file, "%f %f", acceptable+i*2, acceptable+i*2+1);
   }
 
-  printf("num_sensors = %d\nacceptable values: %.2f<-->%.2f : %.2f<-->%.2f\n", 
-	 num_sensors, acceptable[0], acceptable[1], acceptable[2], acceptable[3]);
+#ifdef DEBUG
+  printf("num_sensors = %d\nacceptable values 1: %.2f, %.2f\n", num_sensors, acceptable[0], acceptable[1]);
+  if (num_sensors>1) printf("acceptable values 2: %.2f, %.2f\n\n", acceptable[2], acceptable[3]);
+#endif
 
 
   //////////////////////////////
   // READ THE THERMAL SENSORS //
   //////////////////////////////
-  float* sensor_data = (float*)malloc(sizeof(float) * num_sensors);
-  read_sensor(sensor_filename, sensor_data);
-  if (num_sensors>1) read_sensor(sensor_filename2, sensor_data+1);
+  float* sensor_temp = (float*)malloc(sizeof(float) * num_sensors);
+  int error = 0;
+  error += read_sensor(sensor_filename, sensor_temp);
+  if (num_sensors>1) error += read_sensor(sensor_filename2, sensor_temp+1);
+  if (error) {
+#ifdef DEBUG
+    fprintf(stderr, "Error reading sensors.");
+#endif
+    write_to_error_log("Error reading sensors.");
+    exit(1);
+  }
 
-  printf("sensor_data: %.2f : %.2f\n", sensor_data[0], sensor_data[1]);
+#ifdef DEBUG
+  printf("sensor_temp 1: %.2f\n", sensor_temp[0]);
+  if (num_sensors>1) printf("sensor_temp 2: %.2f\n", sensor_temp[1]);
+  printf("\n");
+#endif
 
 
   ////////////////////
   // SEND TO SERVER //
   ////////////////////
-  struct sensor_data sdata;
-  gethostname(sdata.hostname, 32);
-  sdata.host_num_sensors = num_sensors;
-  sdata.sensor_number = 0;
-  sdata.data = sensor_data[0];
-  sdata.acceptable_low = acceptable[0];
-  sdata.acceptable_high = acceptable[1];
-  gettimestamp(sdata.timestamp, 32);
-  sdata.action = 0;
-
   
-  int sock;
-  ezconnect(&sock, "127.0.0.1", 9042);
-  ezsend(sock, (unsigned char*)&sdata, sizeof(sdata));
+  // Set eztcp to not print to stderr if we are not in debug mode
+#ifndef DEBUG
+  ezsetprinterror(0);
+#endif
 
+  // Connect to our server
+  int sock;
+  if (ezconnect(&sock, "127.0.0.1", 9779) < 0) {
+    write_to_error_log("Error connecting to server.");
+    exit(1);
+  }
+
+  // Fill in structs and send each one to the server
+  struct sensor_data* sdata = (struct sensor_data*)malloc(sizeof(struct sensor_data) * num_sensors);
+  for (i = 0; i < num_sensors; ++i) { // Kinda silly to put this in a loop but it condenses the code
+    gethostname(sdata[i].hostname, 32);
+    sdata[i].host_num_sensors = num_sensors;
+    sdata[i].sensor_number = i;
+    sdata[i].data = sensor_temp[i];
+    sdata[i].acceptable_low = acceptable[i*2];
+    sdata[i].acceptable_high = acceptable[i*2+1];
+    gettimestamp(sdata[i].timestamp, 32);
+    sdata[i].action = 0;
+
+#ifdef DEBUG
+    char debug [1024];
+    sdatatostr(sdata+i, debug, 1024);
+    printf("Sending packet:\n%s\n\n", debug);
+#endif
+    void* ser = malloc(1024);
+    int ser_size = serializesdata(sdata+i, ser);
+    if (ezsend(sock, ser, ser_size) < 0) {
+      write_to_error_log("Error sending data to server.");
+    }
+    free(ser);
+  }
+    
   // Clean up!
-  free(sensor_data);
+  free(sdata);
+  free(sensor_temp);
   free(acceptable);
 
   return 0;
