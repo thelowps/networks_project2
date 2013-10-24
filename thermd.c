@@ -25,6 +25,9 @@ int receive_sensor_data (int conn, struct sensor_data* sdata) {
   return ret;
 }
 
+// Write two sensor datas to a file
+// TODO : this function needs to be thread safe, I think.
+//        maybe we need to lock the file? not sure
 int write_data_to_file (struct sensor_data* sdata1, struct sensor_data* sdata2) {
   char full_filename[30] = "/var/log/therm/temp_logs/";
   char filename[30] = "g18_";
@@ -61,7 +64,7 @@ void handle_client (int conn) {
 
   do {
     if (receive_sensor_data(conn, sdata+i) < 0) {
-      // error in receive -- kill thread?
+      // TODO : error in receive -- kill thread?
     }
     
 #ifdef DEBUG 
@@ -80,6 +83,7 @@ void handle_client (int conn) {
   close(conn);
 }
 
+
 int main(int argc, char** argv) {
   
   //////////////////////////
@@ -95,7 +99,8 @@ int main(int argc, char** argv) {
   ///////////////
   // MAIN LOOP //
   ///////////////
-
+  
+  // TODO : threading. Shouldn't be too bad -- just fork after accepting a client
   while (1) {
     conn = ezaccept(sock);
     handle_client(conn);
