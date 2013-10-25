@@ -47,6 +47,11 @@ int main (int argc, char** argv) {
   char* sensor_filename = "/dev/gotemp";
   char* sensor_filename2 = "/dev/gotemp2";
 
+if (argc < 2){ //if an IP address isn't supplied
+    printf("Please specific a server IP address\n");
+    exit(1);
+}
+
 
   /////////////////////////////////
   // READ THE CONFIGURATION FILE //
@@ -115,9 +120,12 @@ int main (int argc, char** argv) {
   ezsetprinterror(0);
 #endif
 
+char * host; 
+host = argv[1];
+
   // Connect to our server
   int sock;
-  if (ezconnect(&sock, "127.0.0.1", 9779) < 0) {
+  if (ezconnect(&sock, host, 9779) < 0) {
     write_to_error_log("Error connecting to server.");
     exit(1);
   }
