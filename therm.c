@@ -17,7 +17,7 @@
 #include "sensor.h"
 #include "eztcp.h"
 
-#define DEBUG
+// #define DEBUG
 
 // quick and dirty
 void gettimestamp(char* stamp, int len) {
@@ -47,11 +47,11 @@ int main (int argc, char** argv) {
   char* sensor_filename = "/dev/gotemp";
   char* sensor_filename2 = "/dev/gotemp2";
 
-if (argc < 2){ //if an IP address isn't supplied
+  if (argc < 2){ //if an IP address isn't supplied
     printf("Please specific a server IP address\n");
     exit(1);
-}
-
+  }
+  
 
   /////////////////////////////////
   // READ THE CONFIGURATION FILE //
@@ -82,7 +82,7 @@ if (argc < 2){ //if an IP address isn't supplied
   for (i = 0; i < num_sensors; ++i) {
     fscanf(conf_file, "%f %f", acceptable+i*2, acceptable+i*2+1);
   }
-
+  
 #ifdef DEBUG
   printf("num_sensors = %d\nacceptable values 1: %.2f, %.2f\n", num_sensors, acceptable[0], acceptable[1]);
   if (num_sensors>1) printf("acceptable values 2: %.2f, %.2f\n\n", acceptable[2], acceptable[3]);
@@ -136,11 +136,11 @@ host = argv[1];
     gethostname(sdata[i].hostname, 32);
     sdata[i].host_num_sensors = num_sensors;
     sdata[i].sensor_number = i;
-    sdata[i].data = sensor_temp[i];
     sdata[i].acceptable_low = acceptable[i*2];
     sdata[i].acceptable_high = acceptable[i*2+1];
+    sdata[i].data = sdata[i].acceptable_high-1 + i*2;//sensor_temp[i];
     gettimestamp(sdata[i].timestamp, 32);
-    sdata[i].action = 0;
+    sdata[i].action = 1;
 
 #ifdef DEBUG
     char debug [1024];
@@ -148,13 +148,34 @@ host = argv[1];
     printf("Sending packet:\n%s\n\n", debug);
 #endif
     void* ser = malloc(1024);
-    int ser_size = serializesdata(sdata+i, ser);
-    if (ezsend(sock, ser, ser_size) < 0) {
+    int err, ser_size = serializesdata(sdata+i, ser);
+    err = ezsend(sock, &ser_size, sizeof(int));
+    err = ezsend(sock, ser, ser_size);
+    if (err <= 0) {
+#ifdef DEBUG
+      fprintf(stderr, "Error sending data to server.\n");
+#endif
       write_to_error_log("Error sending data to server.");
     }
+
+    if (sdata[i].action == 1) {
+      // We need to receive a status packet from the server!
+      int status;
+      if (err = ezreceive(sock, &status, sizeof(int)) <= 0) {
+	write_to_error_log("Error receiving status packet.");
+      }
+      
+      if (status == 0) {
+	printf("STATUS: OKAY!\n");
+      } else if (status == 1) {
+	printf("STATUS: OVERTEMP\n");
+      }
+
+    }
+
     free(ser);
   }
-    
+  
   // Clean up!
   free(sdata);
   free(sensor_temp);
