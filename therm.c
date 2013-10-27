@@ -104,12 +104,6 @@ int main (int argc, char** argv) {
     exit(1);
   }
 
-#ifdef DEBUG
-  printf("sensor_temp 1: %.2f\n", sensor_temp[0]);
-  if (num_sensors>1) printf("sensor_temp 2: %.2f\n", sensor_temp[1]);
-  printf("\n");
-#endif
-
 
   ////////////////////
   // SEND TO SERVER //
@@ -120,8 +114,8 @@ int main (int argc, char** argv) {
   ezsetprinterror(0);
 #endif
 
-char * host; 
-host = argv[1];
+  char* host; 
+  host = argv[1];
 
   // Connect to our server
   int sock;
@@ -138,7 +132,7 @@ host = argv[1];
     sdata[i].sensor_number = i;
     sdata[i].acceptable_low = acceptable[i*2];
     sdata[i].acceptable_high = acceptable[i*2+1];
-    sdata[i].data = sdata[i].acceptable_high-1 + i*2;//sensor_temp[i];
+    sdata[i].data = sensor_temp[i];
     gettimestamp(sdata[i].timestamp, 32);
     sdata[i].action = 1;
 
