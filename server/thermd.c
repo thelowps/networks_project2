@@ -86,19 +86,23 @@ void handle_client (int conn) {
     printf("Received sensor data: \n%s\n\n", debug);
 #endif
 
-
-  // Send status packet
-    if (sdata[i].action == 1) {
-      int status = sdata[i].data > sdata[i].acceptable_high;
-      ezsend(conn, &status, sizeof(int));
-    }
-    
     ++i;
   } while (i < sdata[0].host_num_sensors);
   
   // Write data to file
   if (sdata[0].action == 0) {
     write_data_to_file(sdata, sdata+1);
+  }
+  
+  struct sensor_data srequest;
+  if (receive_sensor_data(conn, &srequest) > 0) {
+    // Client has send a status request. Send a status packet
+    if (srequest.action == 1) {
+      int status1 = sdata[0].data > sdata[0].acceptable_high ? 1 : 0;
+      int status2 = sdata[1].data > sdata[1].acceptable_high ? 1 : 0;
+      int status = status1 + status2;
+      ezsend(conn, &status, sizeof(int));
+    }
   }
   
   close(conn);
