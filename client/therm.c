@@ -17,7 +17,7 @@
 #include "sensor.h"
 #include "eztcp.h"
 
- #define DEBUG
+ //#define DEBUG
 
 // quick and dirty
 void gettimestamp(char* stamp, int len) {
