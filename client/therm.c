@@ -17,7 +17,7 @@
 #include "sensor.h"
 #include "eztcp.h"
 
-// #define DEBUG
+ #define DEBUG
 
 // quick and dirty
 void gettimestamp(char* stamp, int len) {
@@ -125,16 +125,29 @@ int main (int argc, char** argv) {
   }
 
   // Fill in structs and send each one to the server
-  struct sensor_data* sdata = (struct sensor_data*)malloc(sizeof(struct sensor_data) * num_sensors);
-  for (i = 0; i < num_sensors; ++i) { // Kinda silly to put this in a loop but it condenses the code
-    gethostname(sdata[i].hostname, 32);
-    sdata[i].host_num_sensors = num_sensors;
-    sdata[i].sensor_number = i;
-    sdata[i].acceptable_low = acceptable[i*2];
-    sdata[i].acceptable_high = acceptable[i*2+1];
-    sdata[i].data = sensor_temp[i];
-    gettimestamp(sdata[i].timestamp, 32);
-    sdata[i].action = 1;
+  struct sensor_data* sdata = (struct sensor_data*)malloc(sizeof(struct sensor_data) * (num_sensors+1));
+  for (i = 0; i < num_sensors+1; ++i) { // Kinda silly to put this in a loop but it condenses the code
+    if(i == num_sensors) {
+    	gethostname(sdata[i].hostname, 32); //leaving this (not zero)
+    	sdata[i].host_num_sensors = 0;
+    	sdata[i].sensor_number = 0;
+    	sdata[i].acceptable_low = 0;
+    	sdata[i].acceptable_high = 0;
+    	sdata[i].data = 0;
+    	gettimestamp(sdata[i].timestamp, 32); //leaving this (not zero)
+    	sdata[i].action = 1;  //action packet 
+     }
+  else { 
+    	gethostname(sdata[i].hostname, 32);
+    	sdata[i].host_num_sensors = num_sensors;
+    	sdata[i].sensor_number = i;
+    	sdata[i].acceptable_low = acceptable[i*2];
+   	sdata[i].acceptable_high = acceptable[i*2+1];
+   	sdata[i].data = sensor_temp[i];
+   	gettimestamp(sdata[i].timestamp, 32);
+   	sdata[i].action = 0;
+  }
+ 
 
 #ifdef DEBUG
     char debug [1024];
@@ -162,8 +175,11 @@ int main (int argc, char** argv) {
       if (status == 0) {
 	printf("STATUS: OKAY!\n");
       } else if (status == 1) {
-	printf("STATUS: OVERTEMP\n");
+	printf("STATUS: ONE SENSOR IS OVERTEMP\n");
       }
+       else if(status == 2) {
+	 printf("STATUS: BOTHS SENSORS ARE OVERTEMP\n");
+        }	
 
     }
 
